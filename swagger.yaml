@@ -1,0 +1,161 @@
+swagger: '2.0'
+info:
+  title: Auth Service API
+  description: API для аутентификации пользователей с выдачей и обновлением токенов
+  version: '1.0'
+host: localhost:8080
+basePath: /
+schemes:
+  - http
+paths:
+  /tokens:
+    get:
+      summary: Получить access и refresh токены
+      description: Выдаёт пару токенов для пользователя по его GUID
+      parameters:
+        - name: guid
+          in: query
+          description: Уникальный идентификатор пользователя
+          required: true
+          type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Токены успешно выданы
+          schema:
+            type: object
+            properties:
+              access_token:
+                type: string
+                description: JWT access токен
+                example: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...
+              refresh_token:
+                type: string
+                description: Refresh токен в формате base64
+                example: dGhpc2lzYXJhbmRvbXRva2Vu...
+        '400':
+          description: Неверный запрос (отсутствует guid)
+          schema:
+            $ref: '#/definitions/Error'
+        '401':
+          description: Пользователь с указанным GUID не найден
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Внутренняя ошибка сервера (проблемы с базой или генерацией токенов)
+          schema:
+            $ref: '#/definitions/Error'
+  /refresh:
+    post:
+      summary: Обновить токены
+      description: Обновляет access и refresh токены, проверяя User-Agent и IP
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Токены для обновления
+          required: true
+          schema:
+            type: object
+            required:
+              - access_token
+              - refresh_token
+            properties:
+              access_token:
+                type: string
+                description: Текущий access токен
+                example: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...
+              refresh_token:
+                type: string
+                description: Текущий refresh токен
+                example: dGhpc2lzYXJhbmRvbXRva2Vu...
+      responses:
+        '200':
+          description: Токены успешно обновлены
+          schema:
+            type: object
+            properties:
+              access_token:
+                type: string
+                example: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...
+              refresh_token:
+                type: string
+                example: dGhpc2lzYXJhbmRvbXRva2Vu...
+        '400':
+          description: Неверный формат запроса
+          schema:
+            $ref: '#/definitions/Error'
+        '401':
+          description: Неверный access или refresh токен, сессия не найдена или истекла
+          schema:
+            $ref: '#/definitions/Error'
+        '403':
+          description: User-Agent изменился, сессия удалена
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/Error'
+  /user:
+    get:
+      summary: Получить GUID текущего пользователя
+      description: Возвращает GUID пользователя из access токена
+      security:
+        - bearerAuth: []
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: GUID пользователя
+          schema:
+            type: object
+            properties:
+              guid:
+                type: string
+                example: 550e8400-e29b-41d4-a716-446655440000
+        '401':
+          description: Неверный или отсутствующий токен
+          schema:
+            $ref: '#/definitions/Error'
+  /logout:
+    post:
+      summary: Деавторизовать пользователя
+      description: Удаляет сессию пользователя, делая токены недействительными
+      security:
+        - bearerAuth: []
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Выход успешен
+          schema:
+            type: string
+            example: выход успешен
+        '401':
+          description: Неверный или отсутствующий токен
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/Error'
+securityDefinitions:
+  bearerAuth:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: Bearer токен (например, "Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...")
+definitions:
+  Error:
+    type: object
+    properties:
+      error:
+        type: string
+        description: Описание ошибки
+        example: нужен guid
